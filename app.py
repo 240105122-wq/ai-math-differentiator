@@ -1,5 +1,6 @@
 import streamlit as st
-import requests
+import json
+import urllib.request
 
 # Page configuration
 st.set_page_config(
@@ -39,21 +40,33 @@ Challenge the learner with multi-step logic, conceptual depth, and practical con
 """
 }
 
-def query_huggingface(prompt, token):
-    API_URL = "https://api-inference.huggingface.co/models/Qwen/Qwen2.5-72B-Instruct"
-    headers = {"Authorization": f"Bearer {token}"}
-    payload = {
-        "inputs": prompt,
-        "parameters": {"max_new_tokens": 800, "temperature": 0.7}
+def query_huggingface_router(system_prompt, user_prompt, token):
+    url = "https://router.huggingface.co/hf-inference/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json"
     }
-    response = requests.post(API_URL, headers=headers, json=payload)
-    if response.status_code == 200:
-        res = response.json()
-        if isinstance(res, list) and "generated_text" in res[0]:
-            return res[0]["generated_text"].replace(prompt, "").strip()
-        return str(res)
-    else:
-        raise Exception(f"API Error {response.status_code}: {response.text}")
+    payload = {
+        "model": "Qwen/Qwen2.5-Coder-32B-Instruct",
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ],
+        "max_tokens": 1000
+    }
+    
+    data = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(url, data=data, headers=headers)
+    
+    try:
+        with urllib.request.urlopen(req) as response:
+            result = json.loads(response.read().decode("utf-8"))
+            return result["choices"][0]["message"]["content"]
+    except urllib.error.HTTPError as e:
+        error_text = e.read().decode("utf-8")
+        raise Exception(f"HTTP Error {e.code}: {error_text}")
+    except Exception as e:
+        raise Exception(f"Connection Error: {str(e)}")
 
 # Generate Problem Button
 st.subheader(f"Current Topic: {level}")
@@ -63,9 +76,12 @@ if st.button("✨ Generate Problem & Adaptive Guidance"):
         st.error("Please enter your HuggingFace API Token in the sidebar.")
     else:
         try:
-            full_prompt = f"{SYSTEM_PROMPTS[level]}\n\nTask: Generate one new math problem, its step-by-step solution, and key hints for the student."
             with st.spinner("Generating customized math problem..."):
-                output = query_huggingface(full_prompt, api_key)
+                output = query_huggingface_router(
+                    SYSTEM_PROMPTS[level],
+                    "Generate one new math problem, its step-by-step solution, and key hints for the student.",
+                    api_key
+                )
             st.success("Problem generated successfully!")
             st.markdown(output)
         except Exception as e:
@@ -81,9 +97,12 @@ if st.button("Ask AI Tutor"):
         st.error("Please enter your HuggingFace API Token in the sidebar.")
     elif user_question:
         try:
-            tutoring_prompt = f"System: You are an AI tutor helping a student with a {level} quadratic equation problem.\nStudent question: {user_question}\nAnswer with a helpful hint:"
             with st.spinner("AI Tutor is thinking..."):
-                output = query_huggingface(tutoring_prompt, api_key)
+                output = query_huggingface_router(
+                    f"You are a math tutor helping a student with a {level} quadratic equation problem.",
+                    f"Student question: {user_question}\nProvide a helpful hint without giving away the full answer immediately.",
+                    api_key
+                )
             st.info(output)
         except Exception as e:
             st.error(f"Error: {e}")
