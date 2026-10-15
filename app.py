@@ -40,6 +40,11 @@ Challenge the learner with multi-step logic, conceptual depth, and practical con
 """
 }
 
+# Helper function to get an available model
+def get_working_model():
+    # Primary recommended model name for Gemini API
+    return genai.GenerativeModel('gemini-2.5-flash')
+
 # Generate Problem Button
 st.subheader(f"Current Topic: {level}")
 
@@ -49,7 +54,7 @@ if st.button("✨ Generate Problem & Adaptive Guidance"):
     else:
         try:
             genai.configure(api_key=api_key)
-            model = genai.GenerativeModel('gemini-1.5-flash-latest')
+            model = get_working_model()
             
             prompt = f"{SYSTEM_PROMPTS[level]}\nGenerate one new math problem, its step-by-step solution, and key hints for the student."
             
@@ -60,7 +65,14 @@ if st.button("✨ Generate Problem & Adaptive Guidance"):
             st.markdown(response.text)
             
         except Exception as e:
-            st.error(f"Error generating response: {e}")
+            # Fallback to standard model name if 2.5 is not yet active on the key
+            try:
+                model = genai.GenerativeModel('gemini-1.5-flash')
+                response = model.generate_content(prompt)
+                st.success("Problem generated successfully!")
+                st.markdown(response.text)
+            except Exception as err:
+                st.error(f"Error generating response: {e}")
 
 # Interactive AI Hint / Assistant
 st.markdown("---")
@@ -73,7 +85,7 @@ if st.button("Ask AI Tutor"):
     elif user_question:
         try:
             genai.configure(api_key=api_key)
-            model = genai.GenerativeModel('gemini-1.5-flash-latest')
+            model = get_working_model()
             
             tutoring_prompt = f"The student is working on a {level} quadratic equation problem. Their question is: '{user_question}'. Provide an encouraging hint tailored to {level} without giving away the full answer immediately."
             
@@ -82,4 +94,9 @@ if st.button("Ask AI Tutor"):
                 
             st.info(response.text)
         except Exception as e:
-            st.error(f"Error: {e}")
+            try:
+                model = genai.GenerativeModel('gemini-1.5-flash')
+                response = model.generate_content(tutoring_prompt)
+                st.info(response.text)
+            except Exception as err:
+                st.error(f"Error: {e}")
