@@ -47,7 +47,7 @@ def query_huggingface_router(system_prompt, user_prompt, token):
         "Content-Type": "application/json"
     }
     payload = {
-        "model": "Qwen/Qwen2.5-Coder-32B-Instruct",
+        "model": "meta-llama/Llama-3.2-3B-Instruct",
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt}
