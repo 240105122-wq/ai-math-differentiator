@@ -73,7 +73,7 @@ if st.button("Ask AI Tutor"):
     elif user_question:
         try:
             genai.configure(api_key=api_key)
-            model = genai.GenerativeModel('gemini-1.5-flash')
+            model = genai.GenerativeModel('gemini-1.5-flash-latest')
             
             tutoring_prompt = f"The student is working on a {level} quadratic equation problem. Their question is: '{user_question}'. Provide an encouraging hint tailored to {level} without giving away the full answer immediately."
             
