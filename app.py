@@ -1,6 +1,5 @@
-import os
 import streamlit as st
-import google.generativeai as genai
+import requests
 
 # Page configuration
 st.set_page_config(
@@ -15,9 +14,9 @@ st.markdown("""
 This web application uses AI to adapt **Quadratic Equations** into three distinct levels of difficulty for personalized, differentiated learning.
 """)
 
-# Sidebar for API Key and Level Selection
+# Sidebar
 st.sidebar.header("Settings")
-api_key = st.sidebar.text_input("Enter Gemini API Key", type="password")
+api_key = st.sidebar.text_input("Enter HuggingFace API Token (hf_...)", type="password")
 
 level = st.sidebar.radio(
     "Select Difficulty Level:",
@@ -40,27 +39,37 @@ Challenge the learner with multi-step logic, conceptual depth, and practical con
 """
 }
 
+def query_huggingface(prompt, token):
+    API_URL = "https://api-inference.huggingface.co/models/Qwen/Qwen2.5-72B-Instruct"
+    headers = {"Authorization": f"Bearer {token}"}
+    payload = {
+        "inputs": prompt,
+        "parameters": {"max_new_tokens": 800, "temperature": 0.7}
+    }
+    response = requests.post(API_URL, headers=headers, json=payload)
+    if response.status_code == 200:
+        res = response.json()
+        if isinstance(res, list) and "generated_text" in res[0]:
+            return res[0]["generated_text"].replace(prompt, "").strip()
+        return str(res)
+    else:
+        raise Exception(f"API Error {response.status_code}: {response.text}")
+
 # Generate Problem Button
 st.subheader(f"Current Topic: {level}")
 
 if st.button("✨ Generate Problem & Adaptive Guidance"):
     if not api_key:
-        st.error("Please enter your Gemini API Key in the sidebar to generate problems.")
+        st.error("Please enter your HuggingFace API Token in the sidebar.")
     else:
         try:
-            genai.configure(api_key=api_key)
-            model = genai.GenerativeModel('gemini-3.8-flash')
-            
-            prompt = f"{SYSTEM_PROMPTS[level]}\nGenerate one new math problem, its step-by-step solution, and key hints for the student."
-            
+            full_prompt = f"{SYSTEM_PROMPTS[level]}\n\nTask: Generate one new math problem, its step-by-step solution, and key hints for the student."
             with st.spinner("Generating customized math problem..."):
-                response = model.generate_content(prompt)
-                
+                output = query_huggingface(full_prompt, api_key)
             st.success("Problem generated successfully!")
-            st.markdown(response.text)
-            
+            st.markdown(output)
         except Exception as e:
-            st.error(f"Error generating response: {e}")
+            st.error(f"Error: {e}")
 
 # Interactive AI Hint / Assistant
 st.markdown("---")
@@ -69,17 +78,12 @@ user_question = st.text_input("Ask the AI tutor a question about your problem:")
 
 if st.button("Ask AI Tutor"):
     if not api_key:
-        st.error("Please enter your Gemini API Key in the sidebar.")
+        st.error("Please enter your HuggingFace API Token in the sidebar.")
     elif user_question:
         try:
-            genai.configure(api_key=api_key)
-            model = genai.GenerativeModel('gemini-3.8-flash')
-            
-            tutoring_prompt = f"The student is working on a {level} quadratic equation problem. Their question is: '{user_question}'. Provide an encouraging hint tailored to {level} without giving away the full answer immediately."
-            
+            tutoring_prompt = f"System: You are an AI tutor helping a student with a {level} quadratic equation problem.\nStudent question: {user_question}\nAnswer with a helpful hint:"
             with st.spinner("AI Tutor is thinking..."):
-                response = model.generate_content(tutoring_prompt)
-                
-            st.info(response.text)
+                output = query_huggingface(tutoring_prompt, api_key)
+            st.info(output)
         except Exception as e:
             st.error(f"Error: {e}")
